@@ -132,7 +132,7 @@ gps3==0.33.3
 ha-alpr==0.3
 
 # homeassistant.components.ffmpeg
-ha-ffmpeg==0.13
+ha-ffmpeg==0.14
 
 # homeassistant.components.mqtt.server
 hbmqtt==0.7.1

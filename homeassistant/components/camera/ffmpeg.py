@@ -29,7 +29,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Setup a FFmpeg Camera."""
-    if not run_test(config.get(CONF_INPUT)):
+    if not run_test(hass, config.get(CONF_INPUT)):
         return
     add_devices([FFmpegCamera(config)])
 
