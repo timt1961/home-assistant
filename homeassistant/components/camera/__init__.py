@@ -249,7 +249,7 @@ class CameraMjpegStream(CameraView):
                     response.write(data)
         # pylint: disable=broad-except
         except Exception:
-            break
+            pass
 
         yield from asyncio.gather(
             stream.close(), response.write_eof(), loop=self.hass.loop)
