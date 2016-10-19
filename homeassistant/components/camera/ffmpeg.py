@@ -11,7 +11,7 @@ import voluptuous as vol
 
 from homeassistant.components.camera import (Camera, PLATFORM_SCHEMA)
 from homeassistant.components.ffmpeg import (
-    run_test, get_binary, CONF_INPUT, CONF_EXTRA_ARGUMENTS)
+    async_run_test, get_binary, CONF_INPUT, CONF_EXTRA_ARGUMENTS)
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_NAME
 from homeassistant.util.async import run_coroutine_threadsafe
@@ -64,7 +64,7 @@ class FFmpegCamera(Camera):
         return image
 
     @asyncio.coroutine
-    def async_mjpeg_stream(self, response):
+    def async_mjpeg_stream(self):
         """Generate an HTTP MJPEG stream from the camera."""
         from haffmpeg import CameraMjpegAsync
 
