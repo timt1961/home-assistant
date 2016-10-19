@@ -239,17 +239,17 @@ class CameraMjpegStream(CameraView):
         response.content_type = content
         response.enable_chunked_encoding()
 
-        response.prepare(request)
-        while True:
-            try:
+        yield from response.prepare(request)
+        try:
+            while True:
                 with async_timeout.timeout(15, loop=self.hass.loop):
                     data = yield from stream.read(102400)
                     if not data:
                         break
                     response.write(data)
-            # pylint: disable=broad-except
-            except Exception:
-                break
+        # pylint: disable=broad-except
+        except Exception:
+            break
 
         yield from asyncio.gather(
             stream.close(), response.write_eof(), loop=self.hass.loop)
