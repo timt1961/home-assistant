@@ -22,6 +22,7 @@ REQUIRES = [
     'voluptuous==0.9.2',
     'typing>=3,<4',
     'aiohttp==1.0.5',
+    'async_timeout==1.0.0',
 ]
 
 setup(

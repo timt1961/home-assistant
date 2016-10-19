@@ -9,6 +9,7 @@ import json
 import logging
 
 from aiohttp import web
+import async_timeout
 
 import homeassistant.core as ha
 import homeassistant.remote as rem
@@ -83,7 +84,7 @@ class APIEventStream(HomeAssistantView):
         if restrict:
             restrict = restrict.split(',') + [EVENT_HOMEASSISTANT_STOP]
 
-        @ha.callback
+        @asyncio.coroutine
         def forward_events(event):
             """Forward events to the open request."""
             if event.event_type == EVENT_TIME_CHANGED:
@@ -99,7 +100,7 @@ class APIEventStream(HomeAssistantView):
             else:
                 data = json.dumps(event, cls=rem.JSONEncoder)
 
-            to_write.put(data)
+            yield from to_write.put(data)
 
         response = web.StreamResponse()
         response.content_type = 'text/event-stream'
@@ -111,13 +112,13 @@ class APIEventStream(HomeAssistantView):
             _LOGGER.debug('STREAM %s ATTACHED', id(stop_obj))
 
             # Fire off one message so browsers fire open event right away
-            to_write.put(STREAM_PING_PAYLOAD)
+            yield from to_write.put(STREAM_PING_PAYLOAD)
 
             while True:
                 try:
-                    payload = yield from asyncio.wait_for(
-                        to_write.get(), STREAM_PING_INTERVAL,
-                        loop=self.hass.loop)
+                    with async_timeout.timeout(STREAM_PING_INTERVAL,
+                                               loop=self.hass.loop):
+                        payload = yield from to_write.get()
 
                     if payload is stop_obj:
                         break
@@ -128,7 +129,7 @@ class APIEventStream(HomeAssistantView):
                     response.write(msg.encode("UTF-8"))
                     yield from response.drain()
                 except asyncio.TimeoutError:
-                    to_write.put(STREAM_PING_PAYLOAD)
+                    yield from to_write.put(STREAM_PING_PAYLOAD)
 
         finally:
             _LOGGER.debug('STREAM %s RESPONSE CLOSED', id(stop_obj))
@@ -339,15 +340,16 @@ class APIEventForwardingView(HomeAssistantView):
 
         api = rem.API(host, api_password, port)
 
-        # TODO should by async
-        if not api.validate_api():
+        valid = yield from self.hass.loop.run_in_executor(
+            None, api.validate_api)
+        if not valid:
             return self.json_message("Unable to validate API.",
                                      HTTP_UNPROCESSABLE_ENTITY)
 
         if self.event_forwarder is None:
             self.event_forwarder = rem.EventForwarder(self.hass)
 
-        self.event_forwarder.connect(api)
+        self.event_forwarder.async_connect(api)
 
         return self.json_message("Event forwarding setup.")
 
@@ -373,7 +375,7 @@ class APIEventForwardingView(HomeAssistantView):
         if self.event_forwarder is not None:
             api = rem.API(host, None, port)
 
-            self.event_forwarder.disconnect(api)
+            self.event_forwarder.async_disconnect(api)
 
         return self.json_message("Event forwarding cancelled.")
 
