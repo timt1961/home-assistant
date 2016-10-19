@@ -4,6 +4,7 @@ Support for Cameras with FFmpeg as decoder.
 For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/camera.ffmpeg/
 """
+import asyncio
 import logging
 
 import voluptuous as vol
@@ -13,6 +14,7 @@ from homeassistant.components.ffmpeg import (
     run_test, get_binary, CONF_INPUT, CONF_EXTRA_ARGUMENTS)
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_NAME
+from homeassistant.util.async import run_coroutine_threadsafe
 
 DEPENDENCIES = ['ffmpeg']
 
@@ -27,17 +29,18 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 
-def setup_platform(hass, config, add_devices, discovery_info=None):
+@asyncio.coroutine
+def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     """Setup a FFmpeg Camera."""
-    if not run_test(hass, config.get(CONF_INPUT)):
+    if not async_run_test(hass, config.get(CONF_INPUT)):
         return
-    add_devices([FFmpegCamera(config)])
+    hass.loop.create_task(async_add_devices([FFmpegCamera(hass, config)]))
 
 
 class FFmpegCamera(Camera):
     """An implementation of an FFmpeg camera."""
 
-    def __init__(self, config):
+    def __init__(self, hass, config):
         """Initialize a FFmpeg camera."""
         super().__init__()
         self._name = config.get(CONF_NAME)
@@ -45,23 +48,32 @@ class FFmpegCamera(Camera):
         self._extra_arguments = config.get(CONF_EXTRA_ARGUMENTS)
 
     def camera_image(self):
+        """Return bytes of camera image."""
+        return run_coroutine_threadsafe(
+            self.async_camera_image(), self.hass.loop).result()
+
+    @asyncio.coroutine
+    def async_camera_image(self):
         """Return a still image response from the camera."""
-        from haffmpeg import ImageSingle, IMAGE_JPEG
-        ffmpeg = ImageSingle(get_binary())
+        from haffmpeg import ImageSingleAsync, IMAGE_JPEG
+        ffmpeg = ImageSingleAsync(get_binary(), loop=self.hass.loop)
 
-        return ffmpeg.get_image(self._input, output_format=IMAGE_JPEG,
-                                extra_cmd=self._extra_arguments)
+        image = yield from ffmpeg.get_image(
+            self._input, output_format=IMAGE_JPEG,
+            extra_cmd=self._extra_arguments)
+        return image
 
-    def mjpeg_stream(self, response):
+    @asyncio.coroutine
+    def async_mjpeg_stream(self, response):
         """Generate an HTTP MJPEG stream from the camera."""
-        from haffmpeg import CameraMjpeg
+        from haffmpeg import CameraMjpegAsync
 
-        stream = CameraMjpeg(get_binary())
-        stream.open_camera(self._input, extra_cmd=self._extra_arguments)
-        return response(
+        stream = CameraMjpegAsync(get_binary(), loop=self.hass.loop)
+        yield from stream.open_camera(
+            self._input, extra_cmd=self._extra_arguments)
+        return (
             stream,
-            mimetype='multipart/x-mixed-replace;boundary=ffserver',
-            direct_passthrough=True
+            'multipart/x-mixed-replace;boundary=ffserver'
         )
 
     @property
