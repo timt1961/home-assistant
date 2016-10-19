@@ -98,28 +98,8 @@ class Camera(Entity):
     @asyncio.coroutine
     def async_mjpeg_stream(self):
         """Generate an HTTP MJPEG stream from camera images."""
-        def stream():
-            """Stream images as mjpeg stream."""
-            try:
-                last_image = None
-                while True:
-                    img_bytes = self.camera_image()
-
-                    if img_bytes is not None and img_bytes != last_image:
-                        yield bytes(
-                            '--jpegboundary\r\n'
-                            'Content-Type: image/jpeg\r\n'
-                            'Content-Length: {}\r\n\r\n'.format(
-                                len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
-
-                        last_image = img_bytes
-
-                    time.sleep(0.5)
-            except GeneratorExit:
-                pass
-
         return (
-            stream(),
+            FakeMjpegStream(self),
             'multipart/x-mixed-replace; boundary=--jpegboundary'
         )
 
@@ -147,6 +127,35 @@ class Camera(Entity):
             attr['brand'] = self.brand
 
         return attr
+
+
+class FakeMjpegStream(object):
+    """Fake a file read object for mjpeg streams."""
+
+    def __init__(self, entity):
+        """Init fake mjpeg stream object."""
+        self.entity = entity
+        self.last_image = None
+
+    @asyncio.coroutine
+    def read(self, ignore):
+        """Stream images as mjpeg stream."""
+        img_bytes = yield from self.entity.async_camera_image()
+
+        if img_bytes is not None and img_bytes != last_image:
+            img_bytes =  bytes(
+                '--jpegboundary\r\n'
+                'Content-Type: image/jpeg\r\n'
+                'Content-Length: {}\r\n\r\n'.format(
+                        len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
+
+            last_image = img_bytes
+        return last_image
+
+    @asyncio.coroutine
+    def close(self):
+        """Close fake stream."""
+        return
 
 
 class CameraView(HomeAssistantView):
