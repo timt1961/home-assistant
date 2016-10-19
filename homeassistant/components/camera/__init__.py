@@ -10,6 +10,7 @@ import logging
 import time
 
 from aiohttp import web
+import async_timeout
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
@@ -86,7 +87,10 @@ class Camera(Entity):
 
     @asyncio.coroutine
     def async_camera_image(self):
-        """Return bytes of camera image."""
+        """Return bytes of camera image.
+
+        This method must be run in the event loop.
+        """
         image = yield from self.hass.loop.run_in_executor(
             None, self.camera_image)
         return image
@@ -98,7 +102,10 @@ class Camera(Entity):
 
     @asyncio.coroutine
     def async_mjpeg_stream(self):
-        """Generate an HTTP MJPEG stream from camera images."""
+        """Generate an HTTP MJPEG stream from camera images.
+
+        This method must be run in the event loop.
+        """
         return (
             FakeMjpegStream(self),
             'multipart/x-mixed-replace; boundary=--jpegboundary'
@@ -235,10 +242,11 @@ class CameraMjpegStream(CameraView):
         response.prepare(request)
         while True:
             try:
-                data = yield from stream.read(512)
-                if not data:
-                    break
-                response.write(data)
+                with async_timeout.timeout(15, loop=self.hass.loop):
+                    data = yield from stream.read(512)
+                    if not data:
+                        break
+                    response.write(data)
             # pylint: disable=broad-except
             except Exception:
                 break
