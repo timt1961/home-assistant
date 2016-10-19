@@ -101,7 +101,7 @@ class MjpegCamera(Camera):
         # connect to stream
         try:
             with async_timeout.timeout(10, loop=self.hass.loop):
-                stream = yield from session.get(self._mjpeg_url)
+                stream = yield from self._session.get(self._mjpeg_url)
         except asyncio.TimeoutError:
             return (None, None)
 
