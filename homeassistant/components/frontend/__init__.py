@@ -131,7 +131,10 @@ def setup(hass, config):
     hass.wsgi.register_static_path("/robots.txt",
                                    os.path.join(STATIC_PATH, "robots.txt"))
     hass.wsgi.register_static_path("/static", STATIC_PATH)
-    hass.wsgi.register_static_path("/local", hass.config.path('www'))
+
+    local = hass.config.path('www')
+    if os.path.isdir(local):
+        hass.wsgi.register_static_path("/local", local)
 
     register_built_in_panel(hass, 'map', 'Map', 'mdi:account-location')
 
