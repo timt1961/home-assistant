@@ -243,7 +243,7 @@ class CameraMjpegStream(CameraView):
         while True:
             try:
                 with async_timeout.timeout(15, loop=self.hass.loop):
-                    data = yield from stream.read(512)
+                    data = yield from stream.read(102400)
                     if not data:
                         break
                     response.write(data)
