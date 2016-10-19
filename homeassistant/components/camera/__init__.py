@@ -161,7 +161,7 @@ class CameraView(HomeAssistantView):
         if not authenticated:
             return web.Response(status=401)
 
-        response = yield from self.handle(camera)
+        response = yield from self.handle(request, camera)
         return response
 
     @asyncio.coroutine
@@ -177,14 +177,14 @@ class CameraImageView(CameraView):
     name = "api:camera:image"
 
     @asyncio.coroutine
-    def handle(self, camera):
+    def handle(self, request, camera):
         """Serve camera image."""
-        response = yield from camera.camera_image()
+        image = yield from camera.camera_image()
 
-        if response is None:
+        if image is None:
             return web.Response(status=500)
 
-        return web.Response(body=response)
+        return web.Response(body=image)
 
 
 class CameraMjpegStream(CameraView):
@@ -194,6 +194,30 @@ class CameraMjpegStream(CameraView):
     name = "api:camera:stream"
 
     @asyncio.coroutine
-    def handle(self, camera):
+    def handle(self, request, camera):
         """Serve camera image."""
-        return camera.mjpeg_stream(self.Response)
+        response = web.StreamResponse()
+
+        (stream, content) = yield from camera.mjpeg_stream()
+        if stream is None:
+            return web.Response(status=500)
+
+        # init header
+        response.content_type = content
+        response.enable_chunked_encoding()
+
+        response.prepare(request)
+        while True:
+            try:
+                data = yield from stream.read(512)
+                if not data:
+                    break
+                response.write(data)
+            # pylint: disable=broad-except
+            except Exception as err:
+                _LOGGER.debug("Exception on stream sending.", exc_info=True)
+                break
+
+        yield from asyncio.gather(
+            [stream.close(), response.write_eof()], loop=self.hass.loop)
+        return response
