@@ -167,6 +167,7 @@ def setup(hass, config):
 
 class GzipFileSender(FileSender):
     """FileSender class capable of sending gzip version if available."""
+    # pylint: disable=invalid-name, too-few-public-methods
 
     development = False
 
@@ -225,10 +226,12 @@ class HAStaticRoute(StaticRoute):
     """StaticRoute with support for fingerprinting."""
 
     def __init__(self, prefix, path):
+        """Initialize a static route with gzip and cache busting support."""
         super().__init__(None, prefix, path)
         self._file_sender = _GZIP_FILE_SENDER
 
     def match(self, path):
+        """Match path to filename."""
         if not path.startswith(self._prefix):
             return None
 
@@ -250,7 +253,7 @@ class HomeAssistantWSGI(object):
     def __init__(self, hass, development, api_password, ssl_certificate,
                  ssl_key, server_host, server_port, cors_origins,
                  trusted_networks):
-        """Initilalize the WSGI Home Assistant server."""
+        """Initialize the WSGI Home Assistant server."""
         import aiohttp_cors
 
         self.app = web.Application(loop=hass.loop)
@@ -417,7 +420,7 @@ class HomeAssistantView(object):
 
         self.hass = hass
 
-    def json(self, result, status_code=200):
+    def json(self, result, status_code=200):  # pylint: disable=no-self-use
         """Return a JSON response."""
         msg = json.dumps(
             result, sort_keys=True, cls=rem.JSONEncoder).encode('UTF-8')
@@ -428,7 +431,7 @@ class HomeAssistantView(object):
         """Return a JSON message response."""
         return self.json({'message': error}, status_code)
 
-    def file(self, request, fil):
+    def file(self, request, fil):  # pylint: disable=no-self-use
         """Return a file."""
         assert isinstance(fil, str), 'only string paths allowed'
         return _GZIP_FILE_SENDER.send(request, Path(fil))

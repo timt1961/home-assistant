@@ -250,7 +250,7 @@ class ManifestJSONView(HomeAssistantView):
     name = "manifestjson"
 
     @asyncio.coroutine
-    def get(self, request):
+    def get(self, request):    # pylint: disable=no-self-use
         """Return the manifest.json."""
         msg = json.dumps(MANIFEST_JSON, sort_keys=True).encode('UTF-8')
         return web.Response(body=msg, content_type="application/manifest+json")
