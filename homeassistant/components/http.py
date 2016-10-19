@@ -197,13 +197,6 @@ class HomeAssistantWSGI(object):
         else:
             self.cors = None
 
-        if development:
-            try:
-                import aiohttp_debugtoolbar
-                aiohttp_debugtoolbar.setup(self.app)
-            except ImportError:
-                pass
-
     def register_view(self, view):
         """Register a view with the WSGI server.
 
