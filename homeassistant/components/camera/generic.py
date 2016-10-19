@@ -5,6 +5,7 @@ For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/camera.generic/
 """
 import asyncio
+import functools as ft
 import logging
 
 import aiohttp
@@ -95,13 +96,18 @@ class GenericCamera(Camera):
 
         # aiohttp don't support DigestAuth jet
         if self._authentication == HTTP_DIGEST_AUTHENTICATION:
-            try:
-                kwargs = {'timeout': 10, 'auth': self._auth}
-                response = requests.get(url, **kwargs)
-                self._last_image = response.content
-            except requests.exceptions.RequestException as error:
-                _LOGGER.error('Error getting camera image: %s', error)
-                return self._last_image
+            def fetch():
+                """Read image from a URL."""
+                try:
+                    kwargs = {'timeout': 10, 'auth': self._auth}
+                    response = requests.get(url, **kwargs)
+                    return response.content
+                except requests.exceptions.RequestException as error:
+                    _LOGGER.error('Error getting camera image: %s', error)
+                    return self._last_image
+
+            self._last_image = yield from self.hass.loop.run_in_executor(
+                None, fetch)
         # async
         else:
             try:
