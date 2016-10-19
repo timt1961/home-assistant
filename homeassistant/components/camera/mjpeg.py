@@ -41,7 +41,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 @asyncio.coroutine
 def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     """Setup a MJPEG IP Camera."""
-    hass.loop.create_task(async_add_devices([MjpegCamera(config)]))
+    hass.loop.create_task(async_add_devices([MjpegCamera(hass, config)]))
 
 
 def extract_image_from_mjpeg(stream):
