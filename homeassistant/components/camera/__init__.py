@@ -133,9 +133,10 @@ class Camera(Entity):
 class FakeMjpegStream(object):
     """Fake a file read object for mjpeg streams."""
 
-    def __init__(self, entity):
+    def __init__(self, entity, sleep_time=0.5):
         """Init fake mjpeg stream object."""
         self.entity = entity
+        self.sleep_time = sleep_time
         self.last_image = None
 
     @asyncio.coroutine
@@ -151,11 +152,14 @@ class FakeMjpegStream(object):
                     len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
 
             self.last_image = img_bytes
+
+        yield from asyncio.sleep(self.sleep_time)
         return self.last_image
 
     @asyncio.coroutine
     def close(self):
         """Close fake stream."""
+        self.last_image = None
         return
 
 
@@ -237,9 +241,8 @@ class CameraMjpegStream(CameraView):
                 response.write(data)
             # pylint: disable=broad-except
             except Exception:
-                _LOGGER.debug("Exception on stream sending.", exc_info=True)
                 break
 
         yield from asyncio.gather(
-            [stream.close(), response.write_eof()], loop=self.hass.loop)
+            stream.close(), response.write_eof(), loop=self.hass.loop)
         return response
