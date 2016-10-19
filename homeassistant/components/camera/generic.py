@@ -19,6 +19,7 @@ from homeassistant.const import (
 from homeassistant.exceptions import TemplateError
 from homeassistant.components.camera import (PLATFORM_SCHEMA, Camera)
 from homeassistant.helpers import config_validation as cv
+from homeassistant.util.async import run_coroutine_threadsafe
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class GenericCamera(Camera):
 
         self._last_url = None
         self._last_image = None
-        self._session = aiohttp.ClientSession(loop=hass.loop, auth=auth)
+        self._session = aiohttp.ClientSession(loop=hass.loop, auth=self._auth)
 
     def camera_image(self):
         """Return bytes of camera image."""
