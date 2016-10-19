@@ -8,6 +8,7 @@ import asyncio
 import hmac
 import json
 import logging
+import mimetypes
 import os
 from pathlib import Path
 import re
@@ -15,9 +16,11 @@ import ssl
 from ipaddress import ip_address, ip_network
 
 import voluptuous as vol
-from aiohttp import web
+from aiohttp import web, hdrs
 from aiohttp.file_sender import FileSender
-from aiohttp.web_exceptions import HTTPUnauthorized, HTTPMovedPermanently
+from aiohttp.web_exceptions import (
+    HTTPUnauthorized, HTTPMovedPermanently, HTTPNotModified)
+from aiohttp.web_urldispatcher import StaticRoute
 
 from homeassistant.core import callback, is_callback
 import homeassistant.remote as rem
@@ -162,6 +165,82 @@ def setup(hass, config):
     return True
 
 
+class GzipFileSender(FileSender):
+    """FileSender class capable of sending gzip version if available."""
+
+    development = False
+
+    @asyncio.coroutine
+    def send(self, request, filepath):
+        """Send filepath to client using request."""
+        gzip = False
+        if 'gzip' in request.headers[hdrs.ACCEPT_ENCODING]:
+            gzip_path = filepath.with_name(filepath.name + '.gz')
+
+            if gzip_path.is_file():
+                filepath = gzip_path
+                gzip = True
+
+        st = filepath.stat()
+
+        modsince = request.if_modified_since
+        if modsince is not None and st.st_mtime <= modsince.timestamp():
+            raise HTTPNotModified()
+
+        ct, encoding = mimetypes.guess_type(str(filepath))
+        if not ct:
+            ct = 'application/octet-stream'
+
+        resp = self._response_factory()
+        resp.content_type = ct
+        if encoding:
+            resp.headers[hdrs.CONTENT_ENCODING] = encoding
+        if gzip:
+            resp.headers[hdrs.VARY] = hdrs.ACCEPT_ENCODING
+        resp.last_modified = st.st_mtime
+
+        # CACHE HACK
+        if not self.development:
+            cache_time = 31 * 86400  # = 1 month
+            resp.headers[hdrs.CACHE_CONTROL] = "public, max-age={}".format(
+                cache_time)
+
+        file_size = st.st_size
+
+        resp.content_length = file_size
+        resp.set_tcp_cork(True)
+        try:
+            with filepath.open('rb') as f:
+                yield from self._sendfile(request, resp, f, file_size)
+
+        finally:
+            resp.set_tcp_nodelay(True)
+
+        return resp
+
+_GZIP_FILE_SENDER = GzipFileSender()
+
+
+class HAStaticRoute(StaticRoute):
+    """StaticRoute with support for fingerprinting."""
+
+    def __init__(self, prefix, path):
+        super().__init__(None, prefix, path)
+        self._file_sender = _GZIP_FILE_SENDER
+
+    def match(self, path):
+        if not path.startswith(self._prefix):
+            return None
+
+        # Extra sauce to remove fingerprinted resource names
+        filename = path[self._prefix_len:]
+        fingerprinted = _FINGERPRINT.match(filename)
+        if fingerprinted:
+            filename = '{}.{}'.format(*fingerprinted.groups())
+
+        return {'filename': filename}
+
+
 class HomeAssistantWSGI(object):
     """WSGI server for Home Assistant."""
 
@@ -196,6 +275,9 @@ class HomeAssistantWSGI(object):
             })
         else:
             self.cors = None
+
+        # CACHE HACK
+        _GZIP_FILE_SENDER.development = development
 
     def register_view(self, view):
         """Register a view with the WSGI server.
@@ -247,28 +329,31 @@ class HomeAssistantWSGI(object):
 
         Specify optional cache length of asset in days.
         """
-        # TODO - TEMPORARY WORKAROUND, DOES NOT SUPPORT GZIP
         if os.path.isdir(path):
-            self.app.router.add_static(url_root, path)
+            assert url_root.startswith('/')
+            if not url_root.endswith('/'):
+                url_root += '/'
+            route = HAStaticRoute(url_root, path)
+            self.app.router.register_route(route)
             return
+
+        filepath = Path(path)
 
         @asyncio.coroutine
         def serve_file(request):
             """Redirect to location."""
-            return FileSender().send(request, Path(path))
+            return _GZIP_FILE_SENDER.send(request, filepath)
 
-        self.app.router.add_route('GET', url_root, serve_file)
+        # aiohttp supports regex matching for variables. Using that as temp
+        # to work around cache busting MD5.
+        # Turns something like /static/dev-panel.html into
+        # /static/{filename:dev-panel(-[a-z0-9]{32}|)\.html}
+        base, ext = url_root.rsplit('.', 1)
+        base, file = base.rsplit('/', 1)
+        regex = r"{}(-[a-z0-9]{{32}}|)\.{}".format(file, ext)
+        url_pattern = "{}/{{filename:{}}}".format(base, regex)
 
-        # Cache static while not in development
-        # if cache_length and not self.development:
-        #     # 1 year in seconds
-        #     cache_time = cache_length * 86400
-
-        #     headers.append({
-        #         'prefix': '',
-        #         HTTP_HEADER_CACHE_CONTROL:
-        #         "public, max-age={}".format(cache_time)
-        #     })
+        self.app.router.add_route('GET', url_pattern, serve_file)
 
     @asyncio.coroutine
     def start(self):
@@ -346,7 +431,7 @@ class HomeAssistantView(object):
     def file(self, request, fil):
         """Return a file."""
         assert isinstance(fil, str), 'only string paths allowed'
-        return FileSender().send(request, Path(fil))
+        return _GZIP_FILE_SENDER.send(request, Path(fil))
 
 
 def request_handler_factory(view, handler):
