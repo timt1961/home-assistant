@@ -15,6 +15,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.config_validation import PLATFORM_SCHEMA  # noqa
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.util.asyncio import run_coroutine_threadsafe
 
 DOMAIN = 'camera'
 DEPENDENCIES = ['http']
@@ -81,9 +82,21 @@ class Camera(Entity):
 
     def camera_image(self):
         """Return bytes of camera image."""
+        return run_coroutine_threadsafe(
+            self.async_camera_image(), self.hass.loop).result()
+
+    @asyncio.coroutine
+    def async_camera_image(self):
+        """Return bytes of camera image."""
         raise NotImplementedError()
 
-    def mjpeg_stream(self, response):
+    def mjpeg_stream(self):
+        """Generate an HTTP MJPEG stream from camera images."""
+        return run_coroutine_threadsafe(
+            self.async_mjpeg_stream(), self.hass.loop).result()
+
+    @asyncio.coroutine
+    def async_mjpeg_stream(self):
         """Generate an HTTP MJPEG stream from camera images."""
         def stream():
             """Stream images as mjpeg stream."""
@@ -105,10 +118,9 @@ class Camera(Entity):
             except GeneratorExit:
                 pass
 
-        return response(
+        return (
             stream(),
-            content_type=('multipart/x-mixed-replace; '
-                          'boundary=--jpegboundary')
+            'multipart/x-mixed-replace; boundary=--jpegboundary'
         )
 
     @property
@@ -179,7 +191,7 @@ class CameraImageView(CameraView):
     @asyncio.coroutine
     def handle(self, request, camera):
         """Serve camera image."""
-        image = yield from camera.camera_image()
+        image = yield from camera.async_camera_image()
 
         if image is None:
             return web.Response(status=500)
@@ -198,7 +210,7 @@ class CameraMjpegStream(CameraView):
         """Serve camera image."""
         response = web.StreamResponse()
 
-        (stream, content) = yield from camera.mjpeg_stream()
+        (stream, content) = yield from camera.async_mjpeg_stream()
         if stream is None:
             return web.Response(status=500)
 
