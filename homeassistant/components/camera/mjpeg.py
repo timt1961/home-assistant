@@ -105,12 +105,8 @@ class MjpegCamera(Camera):
         except asyncio.TimeoutError:
             return (None, None)
 
-        @asyncio.coroutine
-        def _close():
-            """Close stream wrapper."""
-            yield from stream.release()
-        # map to StreamReader
-        stream.content.close = _close
+        # map close to StreamReader
+        stream.content.close = stream.release
 
         # send stream to view
         return (
