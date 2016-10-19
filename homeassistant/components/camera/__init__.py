@@ -7,7 +7,6 @@ https://home-assistant.io/components/camera/
 """
 import asyncio
 import logging
-import time
 
 from aiohttp import web
 import async_timeout
