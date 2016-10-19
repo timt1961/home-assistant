@@ -15,7 +15,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.config_validation import PLATFORM_SCHEMA  # noqa
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.util.asyncio import run_coroutine_threadsafe
+from homeassistant.util.async import run_coroutine_threadsafe
 
 DOMAIN = 'camera'
 DEPENDENCIES = ['http']
@@ -82,13 +82,14 @@ class Camera(Entity):
 
     def camera_image(self):
         """Return bytes of camera image."""
-        return run_coroutine_threadsafe(
-            self.async_camera_image(), self.hass.loop).result()
+        raise NotImplementedError()
 
     @asyncio.coroutine
     def async_camera_image(self):
         """Return bytes of camera image."""
-        raise NotImplementedError()
+        image = yield from self.hass.loop.run_in_executor(
+            None, self.camera_image)
+        return image
 
     def mjpeg_stream(self):
         """Generate an HTTP MJPEG stream from camera images."""
@@ -142,15 +143,15 @@ class FakeMjpegStream(object):
         """Stream images as mjpeg stream."""
         img_bytes = yield from self.entity.async_camera_image()
 
-        if img_bytes is not None and img_bytes != last_image:
-            img_bytes =  bytes(
+        if img_bytes is not None and img_bytes != self.last_image:
+            img_bytes = bytes(
                 '--jpegboundary\r\n'
                 'Content-Type: image/jpeg\r\n'
                 'Content-Length: {}\r\n\r\n'.format(
-                        len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
+                    len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
 
-            last_image = img_bytes
-        return last_image
+            self.last_image = img_bytes
+        return self.last_image
 
     @asyncio.coroutine
     def close(self):
@@ -186,7 +187,7 @@ class CameraView(HomeAssistantView):
         return response
 
     @asyncio.coroutine
-    def handle(self, camera):
+    def handle(self, request, camera):
         """Hanlde the camera request."""
         raise NotImplementedError()
 
@@ -235,7 +236,7 @@ class CameraMjpegStream(CameraView):
                     break
                 response.write(data)
             # pylint: disable=broad-except
-            except Exception as err:
+            except Exception:
                 _LOGGER.debug("Exception on stream sending.", exc_info=True)
                 break
 

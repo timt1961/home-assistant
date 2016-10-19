@@ -76,7 +76,7 @@ def async_run_test(hass, input_source):
             return FFMPEG_TEST_CACHE[input_source]
 
         # run test
-        ffmpeg_test = TestAsync(get_binary())
+        ffmpeg_test = TestAsync(get_binary(), hass.loop)
         success = yield from ffmpeg_test.run_test(input_source)
         if not success:
             _LOGGER.error("FFmpeg '%s' test fails!", input_source)
