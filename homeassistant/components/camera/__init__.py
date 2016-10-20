@@ -118,6 +118,8 @@ class Camera(Entity):
         try:
             while True:
                 img_bytes = yield from self.async_camera_image()
+                if not img_bytes:
+                    break
 
                 if img_bytes is not None and img_bytes != last_image:
                     write(img_bytes)
