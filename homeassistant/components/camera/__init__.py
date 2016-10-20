@@ -115,20 +115,24 @@ class Camera(Entity):
 
         last_image = None
 
-        while True:
-            img_bytes = yield from self.async_camera_image()
+        try:
+            while True:
+                img_bytes = yield from self.async_camera_image()
 
-            if img_bytes is not None and img_bytes != last_image:
-                write(img_bytes)
-
-                # Chrome seems to always ignore first picture, print it twice.
-                if last_image is None:
+                if img_bytes is not None and img_bytes != last_image:
                     write(img_bytes)
 
-                last_image = img_bytes
-                yield from response.drain()
+                    # Chrome seems to always ignore first picture,
+                    # print it twice.
+                    if last_image is None:
+                        write(img_bytes)
 
-            yield from asyncio.sleep(.5)
+                    last_image = img_bytes
+                    yield from response.drain()
+
+                yield from asyncio.sleep(.5)
+        finally:
+            self.hass.loop.create_task(response.write_eof())
 
     @property
     def state(self):
