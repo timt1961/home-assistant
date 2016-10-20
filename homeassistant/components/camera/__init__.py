@@ -9,13 +9,11 @@ import asyncio
 import logging
 
 from aiohttp import web
-import async_timeout
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.config_validation import PLATFORM_SCHEMA  # noqa
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.util.async import run_coroutine_threadsafe
 
 DOMAIN = 'camera'
 DEPENDENCIES = ['http']
@@ -94,21 +92,43 @@ class Camera(Entity):
             None, self.camera_image)
         return image
 
-    def mjpeg_stream(self):
-        """Generate an HTTP MJPEG stream from camera images."""
-        return run_coroutine_threadsafe(
-            self.async_mjpeg_stream(), self.hass.loop).result()
-
     @asyncio.coroutine
-    def async_mjpeg_stream(self):
+    def handle_async_mjpeg_stream(self, request):
         """Generate an HTTP MJPEG stream from camera images.
 
         This method must be run in the event loop.
         """
-        return (
-            FakeMjpegStream(self),
-            'multipart/x-mixed-replace; boundary=--jpegboundary'
-        )
+        response = web.StreamResponse()
+
+        response.content_type = ('multipart/x-mixed-replace; '
+                                 'boundary=--jpegboundary')
+        response.enable_chunked_encoding()
+        yield from response.prepare(request)
+
+        def write(img_bytes):
+            """Write image to stream."""
+            response.write(bytes(
+                '--jpegboundary\r\n'
+                'Content-Type: image/jpeg\r\n'
+                'Content-Length: {}\r\n\r\n'.format(
+                    len(img_bytes)), 'utf-8') + img_bytes + b'\r\n')
+
+        last_image = None
+
+        while True:
+            img_bytes = yield from self.async_camera_image()
+
+            if img_bytes is not None and img_bytes != last_image:
+                write(img_bytes)
+
+                # Chrome seems to always ignore first picture, print it twice.
+                if last_image is None:
+                    write(img_bytes)
+
+                last_image = img_bytes
+                yield from response.drain()
+
+            yield from asyncio.sleep(.5)
 
     @property
     def state(self):
@@ -134,39 +154,6 @@ class Camera(Entity):
             attr['brand'] = self.brand
 
         return attr
-
-
-class FakeMjpegStream(object):
-    """Fake a file read object for mjpeg streams."""
-
-    def __init__(self, entity, sleep_time=0.5):
-        """Init fake mjpeg stream object."""
-        self.entity = entity
-        self.sleep_time = sleep_time
-        self.last_image = None
-
-    @asyncio.coroutine
-    def read(self, ignore):
-        """Stream images as mjpeg stream."""
-        img_bytes = yield from self.entity.async_camera_image()
-
-        if img_bytes is not None and img_bytes != self.last_image:
-            img_bytes = bytes(
-                '--jpegboundary\r\n'
-                'Content-Type: image/jpeg\r\n'
-                'Content-Length: {}\r\n\r\n'.format(
-                    len(img_bytes)), 'utf-8') + img_bytes + b'\r\n'
-
-            self.last_image = img_bytes
-
-        yield from asyncio.sleep(self.sleep_time)
-        return self.last_image
-
-    @asyncio.coroutine
-    def close(self):
-        """Close fake stream."""
-        self.last_image = None
-        return
 
 
 class CameraView(HomeAssistantView):
@@ -228,28 +215,4 @@ class CameraMjpegStream(CameraView):
     @asyncio.coroutine
     def handle(self, request, camera):
         """Serve camera image."""
-        response = web.StreamResponse()
-
-        (stream, content) = yield from camera.async_mjpeg_stream()
-        if stream is None:
-            return web.Response(status=500)
-
-        # init header
-        response.content_type = content
-        response.enable_chunked_encoding()
-
-        yield from response.prepare(request)
-        try:
-            while True:
-                with async_timeout.timeout(15, loop=self.hass.loop):
-                    data = yield from stream.read(102400)
-                    if not data:
-                        break
-                    response.write(data)
-        # pylint: disable=broad-except
-        except Exception:
-            pass
-
-        yield from asyncio.gather(
-            stream.close(), response.write_eof(), loop=self.hass.loop)
-        return response
+        yield from camera.handle_async_mjpeg_stream(request)

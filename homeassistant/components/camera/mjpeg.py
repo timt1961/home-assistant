@@ -9,6 +9,8 @@ import logging
 from contextlib import closing
 
 import aiohttp
+from aiohttp import web
+from aiohttp.web_exceptions import HTTPGatewayTimeout
 import async_timeout
 import requests
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
@@ -91,28 +93,34 @@ class MjpegCamera(Camera):
             return extract_image_from_mjpeg(response.iter_content(102400))
 
     @asyncio.coroutine
-    def async_mjpeg_stream(self):
+    def handle_async_mjpeg_stream(self, request):
         """Generate an HTTP MJPEG stream from the camera."""
         # aiohttp don't support DigestAuth -> Fallback
         if self._authentication == HTTP_DIGEST_AUTHENTICATION:
-            stream, content = yield from super().async_mjpeg_stream()
-            return (stream, content)
+            yield from super().handle_async_mjpeg_stream(request)
+            return
 
         # connect to stream
         try:
             with async_timeout.timeout(10, loop=self.hass.loop):
                 stream = yield from self._session.get(self._mjpeg_url)
         except asyncio.TimeoutError:
-            return (None, None)
+            raise HTTPGatewayTimeout()
 
-        # map close to StreamReader
-        stream.content.close = stream.release
+        response = web.StreamResponse()
+        response.content_type = stream.headers.get(CONTENT_TYPE_HEADER)
+        response.enable_chunked_encoding()
 
-        # send stream to view
-        return (
-            stream.content,
-            stream.headers.get(CONTENT_TYPE_HEADER),
-        )
+        yield from response.prepare(request)
+
+        try:
+            while True:
+                data = yield from stream.content.read(102400)
+                if not data:
+                    break
+                response.write(data)
+        finally:
+            self.hass.loop.create_task(stream.release())
 
     @property
     def name(self):

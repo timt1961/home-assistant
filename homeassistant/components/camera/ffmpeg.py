@@ -8,6 +8,7 @@ import asyncio
 import logging
 
 import voluptuous as vol
+from aiohttp import web
 
 from homeassistant.components.camera import (Camera, PLATFORM_SCHEMA)
 from homeassistant.components.ffmpeg import (
@@ -64,17 +65,28 @@ class FFmpegCamera(Camera):
         return image
 
     @asyncio.coroutine
-    def async_mjpeg_stream(self):
+    def handle_async_mjpeg_stream(self, request):
         """Generate an HTTP MJPEG stream from the camera."""
         from haffmpeg import CameraMjpegAsync
 
         stream = CameraMjpegAsync(get_binary(), loop=self.hass.loop)
         yield from stream.open_camera(
             self._input, extra_cmd=self._extra_arguments)
-        return (
-            stream,
-            'multipart/x-mixed-replace;boundary=ffserver'
-        )
+
+        response = web.StreamResponse()
+        response.content_type = 'multipart/x-mixed-replace;boundary=ffserver'
+        response.enable_chunked_encoding()
+
+        yield from response.prepare(request)
+
+        try:
+            while True:
+                data = yield from stream.read(102400)
+                if not data:
+                    break
+                response.write(data)
+        finally:
+            self.hass.loop.create_task(stream.close())
 
     @property
     def name(self):
