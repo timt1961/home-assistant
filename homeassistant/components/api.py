@@ -199,7 +199,7 @@ class APIEntityStateView(HomeAssistantView):
         """Update state of entity."""
         try:
             data = yield from request.json()
-        except json.decoder.JSONDecodeError:
+        except ValueError:
             return self.json_message('Invalid JSON specified',
                                      HTTP_BAD_REQUEST)
 
@@ -322,7 +322,7 @@ class APIEventForwardingView(HomeAssistantView):
         """Setup an event forwarder."""
         try:
             data = yield from request.json()
-        except json.decoder.JSONDecodeError:
+        except ValueError:
             return self.json_message("No data received.", HTTP_BAD_REQUEST)
 
         try:
@@ -358,7 +358,7 @@ class APIEventForwardingView(HomeAssistantView):
         """Remove event forwarer."""
         try:
             data = yield from request.json()
-        except json.decoder.JSONDecodeError:
+        except ValueError:
             return self.json_message("No data received.", HTTP_BAD_REQUEST)
 
         try:
@@ -417,7 +417,7 @@ class APITemplateView(HomeAssistantView):
             data = yield from request.json()
             tpl = template.Template(data['template'], self.hass)
             return tpl.async_render(data.get('variables'))
-        except (json.decoder.JSONDecodeError, TemplateError) as ex:
+        except (ValueError, TemplateError) as ex:
             return self.json_message('Error rendering template: {}'.format(ex),
                                      HTTP_BAD_REQUEST)
 
