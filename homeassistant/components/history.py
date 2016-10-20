@@ -205,7 +205,7 @@ class Last5StatesView(HomeAssistantView):
     def get(self, request, entity_id):
         """Retrieve last 5 states of entity."""
         result = yield from self.hass.loop.run_in_executor(
-            last_5_states, entity_id)
+            None, last_5_states, entity_id)
         return self.json(result)
 
 

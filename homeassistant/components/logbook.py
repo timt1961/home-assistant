@@ -146,7 +146,7 @@ class LogbookView(HomeAssistantView):
             events = recorder.execute(query)
             return _exclude_events(events, self.config)
 
-        events = yield from self.hass.loop.run_in_executor(get_results)
+        events = yield from self.hass.loop.run_in_executor(None, get_results)
 
         return self.json(humanify(events))
 
