@@ -241,7 +241,7 @@ class HistoryPeriodView(HomeAssistantView):
         entity_id = request.GET.get('filter_entity_id')
 
         result = yield from self.hass.loop.run_in_executor(
-            get_significant_states, start_time, end_time, entity_id,
+            None, get_significant_states, start_time, end_time, entity_id,
             self.filters)
 
         return self.json(result.values())
