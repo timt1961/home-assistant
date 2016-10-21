@@ -22,6 +22,7 @@ from tests.common import get_test_home_assistant, mock_service
 
 
 def test_async_track_states(event_loop):
+    """Test AsyncTrackStates context manager."""
     hass = get_test_home_assistant()
 
     try:
