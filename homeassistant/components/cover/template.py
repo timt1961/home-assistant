@@ -59,7 +59,6 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
                       state_template.extract_entities())
 
         state_template.hass = hass
-        _LOGGER.error("Appending %s", friendly_name)
         covers.append(
             CoverTemplate(
                 hass,
@@ -72,15 +71,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
                 entity_ids)
             )
     if not covers:
-        _LOGGER.error("No covers added")
         return False
-    else:
-        _LOGGER.error('Covers defined')
-
-    if not async_add_devices:
-        _LOGGER.error('No add devices')
-    else:
-        _LOGGER.error('async_add_devices: %s', async_add_devices)
 
     async_add_devices(covers, True)
     return True
@@ -151,7 +142,6 @@ class CoverTemplate(CoverDevice):
     @property
     def is_closed(self):
         """Return true if device is on."""
-        _LOGGER.error("called is_closed")
         if self._position is not None:
             if self.current_cover_position >0:
                 return False
@@ -164,7 +154,6 @@ class CoverTemplate(CoverDevice):
     @property
     def available(self):
         """If cover is available."""
-        _LOGGER.error("Called available")
         return self._state is not None
 
     def open_cover(self, **kwargs):
@@ -185,7 +174,6 @@ class CoverTemplate(CoverDevice):
         """Update the state from the template."""
         try:
             state = self._template.async_render().lower()
-            _LOGGER.error('state = %s', state)
             if state in _VALID_STATES:
                 self._state = state in ('true', STATE_CLOSED)
             else:
