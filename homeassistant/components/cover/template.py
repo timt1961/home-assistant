@@ -129,27 +129,6 @@ class CoverTemplate(CoverDevice):
         """No polling needed."""
         return False
 
-    @property
-    def current_cover_position(self):
-        """Return the current position of the cover"""
-        return self._position
-
-    @property
-    def current_cover_tilt_position(self):
-        """Return the current tilt position of the cover"""
-        return self._tilt_position
-
-    @property
-    def is_closed(self):
-        """Return true if device is on."""
-        if self._position is not None:
-            if self.current_cover_position >0:
-                return False
-            else:
-                return True
-        else:
-            return None
-
 
     @property
     def available(self):
