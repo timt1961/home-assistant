@@ -14,7 +14,7 @@ from homeassistant.components.cover import (
     ENTITY_ID_FORMAT, CoverDevice, PLATFORM_SCHEMA)
 from homeassistant.const import (
     ATTR_FRIENDLY_NAME, CONF_VALUE_TEMPLATE, STATE_OPEN, STATE_CLOSED,
-    STATE_UNKNOWN,  ATTR_ENTITY_ID, CONF_COVERS, EVENT_HOMEASSISTANT_START)
+    STATE_UNKNOWN, ATTR_ENTITY_ID, CONF_COVERS, EVENT_HOMEASSISTANT_START)
 from homeassistant.exceptions import TemplateError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -129,7 +129,6 @@ class CoverTemplate(CoverDevice):
         """No polling needed."""
         return False
 
-
     @property
     def available(self):
         """If cover is available."""
@@ -144,9 +143,9 @@ class CoverTemplate(CoverDevice):
         self._close_script.run()
 
     def stop_cover(self, **kwargs):
-        """Fire the stop action"""
+        """Fire the stop action."""
         self._stop_script.run()
-        
+
 
     @asyncio.coroutine
     def async_update(self):

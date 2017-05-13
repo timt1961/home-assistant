@@ -1,40 +1,38 @@
 """The tests for the  Template cover platform."""
 import asyncio
-
-from homeassistant.core import callback, State, CoreState
+import unittest
+from homeassistant.core import State, CoreState
 from homeassistant import setup
-import homeassistant.components as core
-from homeassistant.const import STATE_CLOSE, STATE_CLOSED, STATE_UNKNOWN
+from homeassistant.const import STATE_OPEN, STATE_CLOSED, STATE_UNKNOWN
 from homeassistant.helpers.restore_state import DATA_RESTORE_CACHE
+from homeassistant.setup import setup_component
+import homeassistant.components.cover as cover
 
 from tests.common import (
     get_test_home_assistant, assert_setup_component, mock_component)
 
 
-class TestTemplateCover:
+class TestTemplateCover(unittest.TestCase):
     """Test the Template cover."""
 
-
-    def setup_method(self): #pylint: disable=invalid-name
+    def setup_method(self, method):  # pylint: disable=invalid-name
         """Setup things to be run when tests are started."""
         self.hass = get_test_home_assistant()
         self.assertTrue(setup_component(self.hass, cover.DOMAIN, {'cover': {
             'platform': 'template',
         }}))
-       
-    def teardown_method(self): #pylint: disable=invalid-name
+
+    def teardown_method(self, method):  # pylint: disable=invalid-name
         """Stop everything that was started."""
         self.hass.stop()
 
-    def test.should_poll(self):
-        """Test the polling setting"""
-        
+    def should_poll(self):
+        """Test the polling setting."""
         templ_cover = templ.CoverTemplate(self.hass, 'foo',
-                                         'open_cover', 'close_cover', 'stop_cover',
-                                         'cover.test_state')
+                                          'open_cover', 'close_cover',
+                                          'stop_cover', 'cover.test_state')
 
         self.assertFalse(templ_cover.should_poll)
-                      
                             
     def test_template_state_text(self):
         """"Test the state text of a template."""
@@ -72,7 +70,7 @@ class TestTemplateCover:
         state = self.hass.states.get('cover.test_template_cover')
         assert state.state == STATE_OPEN
 
-        state = self.hass.states.set('cover.test_state', STATE_CLOSE)
+        state = self.hass.states.set('cover.test_state', STATE_CLOSED)
         self.hass.block_till_done()
 
         state = self.hass.states.get('cover.test_template_cover')
@@ -83,7 +81,6 @@ class TestTemplateCover:
 
         state = self.hass.states.get('cover.test_template_cover')
         assert state.state == STATE_UNKNOWN
-
 
     def test_template_syntax_error(self):
         """Test templating syntax error."""
@@ -200,8 +197,6 @@ class TestTemplateCover:
 
         assert self.hass.states.all() == []
 
-
-
 @asyncio.coroutine
 def test_restore_state(hass):
     """Ensure states are restored on startup."""
@@ -220,12 +215,12 @@ def test_restore_state(hass):
                 'test_template_cover': {
                     'value_template':
                         "{{ states.cover.test_state.state }}",
-                    'turn_on': {
-                        'service': 'cover.turn_on',
+                    'close_cover': {
+                        'service': 'cover.close_cover',
                         'entity_id': 'cover.test_state'
                     },
-                    'turn_off': {
-                        'service': 'cover.turn_off',
+                    'open_cover': {
+                        'service': 'cover.open_cover',
                         'entity_id': 'cover.test_state'
                     },
                 }
