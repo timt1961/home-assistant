@@ -31,9 +31,9 @@ STOP_ACTION = 'stop_cover'
 
 COVER_SCHEMA = vol.Schema({
     vol.Required(CONF_VALUE_TEMPLATE): cv.template,
-    vol.Required(OPEN_ACTION): cv.SCRIPT_SCHEMA,
-    vol.Required(CLOSE_ACTION): cv.SCRIPT_SCHEMA,
-    vol.Required(STOP_ACTION): cv.SCRIPT_SCHEMA,
+    vol.Optional(OPEN_ACTION): cv.SCRIPT_SCHEMA,
+    vol.Optional(CLOSE_ACTION): cv.SCRIPT_SCHEMA,
+    vol.Optional(STOP_ACTION): cv.SCRIPT_SCHEMA,
     vol.Optional(ATTR_FRIENDLY_NAME): cv.string,
     vol.Optional(ATTR_ENTITY_ID): cv.entity_ids
 })
@@ -83,6 +83,8 @@ class CoverTemplate(CoverDevice):
     def __init__(self, hass, device_id, friendly_name, state_template,
                  close_action, open_action, stop_action, entity_ids):
         """Initialize the Template cover."""
+        _LOGGER.info("CoverTemplate called")
+
         self.hass = hass
         self.entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, device_id,
                                                   hass=hass)

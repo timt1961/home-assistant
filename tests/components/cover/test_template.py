@@ -36,30 +36,34 @@ class TestTemplateCover(unittest.TestCase):
                             
     def test_template_state_text(self):
         """"Test the state text of a template."""
-        with assert_setup_component(1):
-            assert setup.setup_component(self.hass, 'cover', {
+        spec = {
                 'cover': {
                     'platform': 'template',
                     'covers': {
-                        'test_template_cover': {
+                        'test_cover': {
                             'value_template':
-                                "{{ states.cover.test_state.state }}",
+                                "{{ is_state('cover.test_cover', 'unknown' }}",
                             'open_cover': {
                                 'service': 'cover.open_cover',
-                                'entity_id': 'cover.test_state'
-                            },
+                                'entity_id': 'cover.test_cover'
+                                },
                             'close_cover': {
                                 'service': 'cover.close_cover',
-                                'entity_id': 'cover.test_state'
+                                'entity_id': 'cover.test_cover'
                             },
                             'stop_cover': {
                                 'service': 'cover.stop_cover',
-                                'entity_id': 'cover.test_state'
+                                'entity_id': 'cover.test_cover'
                             },
                         }
                     }
                 }
-            })
+            }
+        import pdb
+        pdb.set_trace()
+        
+        with assert_setup_component(1,'cover'):
+            assert setup.setup_component(self.hass, 'cover', spec)
 
         self.hass.start()
         self.hass.block_till_done()
@@ -84,7 +88,7 @@ class TestTemplateCover(unittest.TestCase):
 
     def test_template_syntax_error(self):
         """Test templating syntax error."""
-        with assert_setup_component(0):
+        with assert_setup_component(0, 'cover'):
             assert setup.setup_component(self.hass, 'cover', {
                 'cover': {
                     'platform': 'template',
@@ -112,7 +116,7 @@ class TestTemplateCover(unittest.TestCase):
 
     def test_invalid_name_does_not_create(self):
         """Test invalid name."""
-        with assert_setup_component(0):
+        with assert_setup_component(0,'cover'):
             assert setup.setup_component(self.hass, 'cover', {
                 'cover': {
                     'platform': 'template',
@@ -140,7 +144,7 @@ class TestTemplateCover(unittest.TestCase):
 
     def test_invalid_cover_does_not_create(self):
         """Test invalid cover."""
-        with assert_setup_component(0):
+        with assert_setup_component(0, 'cover'):
             assert setup.setup_component(self.hass, 'cover', {
                 'cover': {
                     'platform': 'template',
@@ -157,7 +161,7 @@ class TestTemplateCover(unittest.TestCase):
 
     def test_no_covers_does_not_create(self):
         """Test if there are no covers no creation."""
-        with assert_setup_component(0):
+        with assert_setup_component(0,'cover'):
             assert setup.setup_component(self.hass, 'cover', {
                 'cover': {
                     'platform': 'template'
@@ -171,7 +175,7 @@ class TestTemplateCover(unittest.TestCase):
 
     def test_missing_template_does_not_create(self):
         """Test missing template."""
-        with assert_setup_component(0):
+        with assert_setup_component(0,'cover'):
             assert setup.setup_component(self.hass, 'cover', {
                 'cover': {
                     'platform': 'template',
@@ -221,6 +225,10 @@ def test_restore_state(hass):
                     },
                     'open_cover': {
                         'service': 'cover.open_cover',
+                        'entity_id': 'cover.test_state'
+                    },
+                    'stop_cover': {
+                        'service': 'cover.stop_cover',
                         'entity_id': 'cover.test_state'
                     },
                 }
